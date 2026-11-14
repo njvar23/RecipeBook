@@ -1,0 +1,12 @@
+using RecipeBook.Api.Entities;
+
+namespace RecipeBook.Api.DTOs.Recipes;
+
+/// <summary>Flat ingredient line: the ingredient's name is pulled up from the nested Ingredient.</summary>
+public class RecipeIngredientDto
+{
+    public int IngredientId { get; set; }
+    public string IngredientName { get; set; } = string.Empty;
+    public decimal Quantity { get; set; }
+    public MeasurementUnit Unit { get; set; }
+}
