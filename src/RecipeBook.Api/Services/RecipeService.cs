@@ -16,6 +16,9 @@ public class RecipeService(
     IMapper mapper,
     ICurrentUserService currentUser) : IRecipeService
 {
+    /// <summary>How many ingredients a recipe may lack and still appear in "almost can cook".</summary>
+    private const int MaxMissingIngredients = 2;
+
     public Task<PagedResult<RecipeListDto>> GetAllAsync(RecipeQueryParameters query, CancellationToken ct)
     {
         var recipes = db.Recipes.AsQueryable();
@@ -121,6 +124,45 @@ public class RecipeService(
         // Steps, ingredient links, comments and favorites go with it (ON DELETE CASCADE)
         db.Recipes.Remove(recipe);
         await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<SearchByIngredientsResponse> SearchByIngredientsAsync(
+        SearchByIngredientsRequest request, CancellationToken ct)
+    {
+        var have = request.IngredientIds.Distinct().ToList();
+
+        // Recipes that use at least one ingredient I have and lack at most 2 others
+        var candidates = db.Recipes.Where(r =>
+            r.RecipeIngredients.Any(ri => have.Contains(ri.IngredientId)) &&
+            r.RecipeIngredients.Count(ri => !have.Contains(ri.IngredientId)) <= MaxMissingIngredients);
+
+        var matches = await candidates
+            .OrderBy(r => r.Title)
+            .ProjectTo<RecipeMatchDto>(mapper.ConfigurationProvider)
+            .ToListAsync(ct);
+
+        if (matches.Count == 0)
+            return new SearchByIngredientsResponse();
+
+        // Names of the missing ingredients for each candidate recipe
+        var recipeIds = matches.Select(m => m.Id).ToList();
+        var missing = await db.RecipeIngredients
+            .Where(ri => recipeIds.Contains(ri.RecipeId) && !have.Contains(ri.IngredientId))
+            .Select(ri => new { ri.RecipeId, ri.Ingredient.Name })
+            .ToListAsync(ct);
+
+        var missingByRecipe = missing.ToLookup(m => m.RecipeId, m => m.Name);
+        foreach (var match in matches)
+            match.MissingIngredients = missingByRecipe[match.Id].Order().ToList();
+
+        return new SearchByIngredientsResponse
+        {
+            CanCook = matches.Where(m => m.MissingIngredients.Count == 0).ToList(),
+            AlmostCanCook = matches
+                .Where(m => m.MissingIngredients.Count > 0)
+                .OrderBy(m => m.MissingIngredients.Count).ThenBy(m => m.Title)
+                .ToList()
+        };
     }
 
     /// <summary>Business rule 1 (ownership): only the author or an Admin may change a recipe.</summary>

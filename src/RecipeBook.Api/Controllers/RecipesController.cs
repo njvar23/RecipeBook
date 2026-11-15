@@ -64,6 +64,16 @@ public class RecipesController(IRecipeService recipeService) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Bonus — "What can I cook?": recipes I can make fully, and ones missing at most 2 ingredients.</summary>
+    [HttpPost("search-by-ingredients")]
+    [ProducesResponseType<SearchByIngredientsResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<SearchByIngredientsResponse>> SearchByIngredients(
+        SearchByIngredientsRequest request, CancellationToken ct)
+    {
+        return Ok(await recipeService.SearchByIngredientsAsync(request, ct));
+    }
+
     /// <summary>Recipes I have written.</summary>
     [HttpGet("/api/me/recipes")]
     [Authorize(Roles = "User")]

@@ -27,6 +27,11 @@ public class RecipeProfile : Profile
             // depends on who is asking, so RecipeService fills it in after mapping
             .ForMember(d => d.IsFavorite, o => o.Ignore());
 
+        CreateMap<Recipe, RecipeMatchDto>()
+            .IncludeBase<Recipe, RecipeListDto>()
+            .ForMember(d => d.TotalIngredients, o => o.MapFrom(s => s.RecipeIngredients.Count))
+            .ForMember(d => d.MissingIngredients, o => o.Ignore()); // depends on the request, filled in by the service
+
         CreateMap<Step, StepDto>();
 
         // Flat ingredient line: the name comes from the nested Ingredient entity

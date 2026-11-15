@@ -11,4 +11,5 @@ public interface IRecipeService
     Task<RecipeDetailsDto> CreateAsync(CreateRecipeRequest request, CancellationToken ct);
     Task<RecipeDetailsDto> UpdateAsync(int id, UpdateRecipeRequest request, CancellationToken ct);
     Task DeleteAsync(int id, CancellationToken ct);
+    Task<SearchByIngredientsResponse> SearchByIngredientsAsync(SearchByIngredientsRequest request, CancellationToken ct);
 }
