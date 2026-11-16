@@ -1,0 +1,190 @@
+### RecipeBook API — demo scenario
+### Works in Visual Studio / Rider / VS Code (REST Client extension).
+### Run the API first (dotnet run), then execute the requests top to bottom.
+
+@baseUrl = http://localhost:5080
+
+### 1. Register a new user (always gets the "User" role)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "luka@recipebook.ge",
+  "password": "Luka12345",
+  "displayName": "ლუკა"
+}
+
+### 2. Validation error — every broken rule is returned at once
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "password": "short",
+  "displayName": "x"
+}
+
+### 3. Log in as the seeded user Nino — copy accessToken into @userToken below
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nino@recipebook.ge",
+  "password": "Nino1234!"
+}
+
+### 4. Log in as the seeded admin — copy accessToken into @adminToken below
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@recipebook.ge",
+  "password": "Admin123!"
+}
+
+@userToken = paste-user-token-here
+@adminToken = paste-admin-token-here
+
+### 5. No token → 401
+GET {{baseUrl}}/api/recipes
+
+### 6. Recipe list with filters and pagination
+GET {{baseUrl}}/api/recipes?difficulty=Easy&maxMinutes=60&page=1&pageSize=10
+Authorization: Bearer {{userToken}}
+
+### 7. Lookups
+GET {{baseUrl}}/api/categories
+Authorization: Bearer {{userToken}}
+
+###
+GET {{baseUrl}}/api/ingredients?search=ყველ
+Authorization: Bearer {{userToken}}
+
+### 8. Create a recipe with steps and ingredients in one request → 201
+POST {{baseUrl}}/api/recipes
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "title": "ხაჭაპური იმერული",
+  "description": "მრგვალი ხაჭაპური იმერული ყველით.",
+  "cookingMinutes": 50,
+  "servings": 4,
+  "difficulty": "Medium",
+  "categoryId": 3,
+  "steps": [
+    { "order": 1, "instruction": "მოზილეთ ცომი მაწონით, ფქვილით და მარილით." },
+    { "order": 2, "instruction": "ჩადეთ ყველი, შეკარით და გააბრტყელეთ." },
+    { "order": 3, "instruction": "გამოაცხვეთ ტაფაზე ორივე მხრიდან." }
+  ],
+  "ingredients": [
+    { "ingredientId": 1,  "quantity": 500, "unit": "Gram" },
+    { "ingredientId": 25, "quantity": 250, "unit": "Ml" },
+    { "ingredientId": 9,  "quantity": 400, "unit": "Gram" },
+    { "ingredientId": 5,  "quantity": 1,   "unit": "Tsp" }
+  ]
+}
+
+### 9. Invalid recipe → 400 with all errors (bad step order, unknown ingredient, bad unit...)
+POST {{baseUrl}}/api/recipes
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "title": "ab",
+  "cookingMinutes": 0,
+  "servings": 2,
+  "difficulty": "Super",
+  "categoryId": 99,
+  "steps": [ { "order": 1, "instruction": "ok" }, { "order": 3, "instruction": "skip" } ],
+  "ingredients": [ { "ingredientId": 999, "quantity": -1, "unit": "Kg" } ]
+}
+
+### 10. Full recipe details (steps sorted, ingredients, comments, isFavorite)
+GET {{baseUrl}}/api/recipes/1
+Authorization: Bearer {{userToken}}
+
+### 11. Admin cannot create recipes (role "User" only) → 403
+POST {{baseUrl}}/api/recipes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "title": "admin recipe" }
+
+### 12. Nino tries to edit Giorgi's recipe (id 3) → 403 (ownership check in the service)
+PUT {{baseUrl}}/api/recipes/3
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "title": "სხვისი რეცეპტი",
+  "cookingMinutes": 10,
+  "servings": 1,
+  "difficulty": "Easy",
+  "categoryId": 1,
+  "steps": [ { "order": 1, "instruction": "test step" } ],
+  "ingredients": [ { "ingredientId": 5, "quantity": 1, "unit": "Tsp" } ]
+}
+
+### 13. Favorites: add (201), add again (409), list, remove (204)
+POST {{baseUrl}}/api/recipes/3/favorite
+Authorization: Bearer {{userToken}}
+
+###
+POST {{baseUrl}}/api/recipes/3/favorite
+Authorization: Bearer {{userToken}}
+
+###
+GET {{baseUrl}}/api/me/favorites
+Authorization: Bearer {{userToken}}
+
+###
+DELETE {{baseUrl}}/api/recipes/3/favorite
+Authorization: Bearer {{userToken}}
+
+### 14. Comment on a recipe
+POST {{baseUrl}}/api/recipes/3/comments
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "text": "აუცილებლად გავაკეთებ!" }
+
+### 15. Chef profile upsert (201 first time, 200 after) and someone else's profile
+PUT {{baseUrl}}/api/me/chef-profile
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "bio": "ქართული ცომეულის მოყვარული.", "speciality": "ქართული ცომეული", "yearsOfExperience": 7 }
+
+###
+GET {{baseUrl}}/api/users/2/chef-profile
+Authorization: Bearer {{userToken}}
+
+### 16. My recipes
+GET {{baseUrl}}/api/me/recipes
+Authorization: Bearer {{userToken}}
+
+### 17. Admin adds lookups (409 if the name already exists)
+POST {{baseUrl}}/api/categories
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "საუზმე" }
+
+###
+POST {{baseUrl}}/api/ingredients
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "ტარხუნა" }
+
+### 18. BONUS — "What can I cook?" (tomato, cucumber, onion, walnut)
+POST {{baseUrl}}/api/recipes/search-by-ingredients
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{ "ingredientIds": [12, 13, 10, 14] }
+
+### 19. Admin deletes any recipe (cascades steps, ingredient links, comments, favorites) → 204
+DELETE {{baseUrl}}/api/recipes/4
+Authorization: Bearer {{adminToken}}
